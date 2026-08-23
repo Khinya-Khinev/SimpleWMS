@@ -26,7 +26,6 @@ Supports goods receiving and employee management.
 
 Java 25 · Spring Boot 4 · Spring Security · Spring Cloud Gateway · Hibernate/JPA · PostgreSQL · Flyway · Redis · Apache Kafka · JUnit 5 · Mockito · Testcontainers · Docker
 
----
 ## Services
 
 ### API Gateway
@@ -34,8 +33,6 @@ Java 25 · Spring Boot 4 · Spring Security · Spring Cloud Gateway · Hibernate
 
 Single entry point for the frontend: routes requests to backend services, handles the OAuth2 Authorization Code flow as an OAuth2 Client, 
 and relays access tokens downstream. Session state stored in Redis.
-
----
 
 ### Receiving Service
 
@@ -61,23 +58,17 @@ Some modules interact directly with JPA repositories where additional abstractio
   <img src="docs/receiving-service-architecture.excalidraw.png" alt="Receiving Service Architecture">
 </p>
 
-
----
-
 ### Authorization Service (OAuth2)
 [GitHub Repository](https://github.com/Khinya-Khinev/Auth-Service)
 
 OAuth2 / OpenID Connect Authorization Server for the WMS: authenticates employees, issues access/refresh/ID tokens
 and manages accounts.
 
----
-
 ### Frontend Service (in progress)
 [GitHub | Ivan Khramoy](https://github.com/IvanKhramoy/receiving-serivce-ui)
 
 Web Client. Currently not included in Docker Compose.
 
----
 ## API Overview – Swagger 
 
 + Endpoints and request/responce schema: `http://localhost:8080/swagger-ui/index.html`
