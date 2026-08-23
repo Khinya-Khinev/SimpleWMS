@@ -1,0 +1,216 @@
+services:
+  # ==================== PostgreSQL для Auth Service ====================
+  postgres-auth:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: postgres-auth
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER:-auth_user} -d ${AUTH_DB_NAME:-authdb}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - waregang-net
+
+  # ==================== PostgreSQL для Receiving Service ====================
+  postgres-receiving:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: postgres-receiving
+    environment:
+      POSTGRES_DB: ${RECEIVING_DB_NAME}
+      POSTGRES_USER: ${RECEIVING_DB_USER}
+      POSTGRES_PASSWORD: ${RECEIVING_DB_PASSWORD}
+    ports:
+      - "5434:5432"           # внешний порт 5434
+    volumes:
+      - postgres_receiving_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RECEIVING_DB_USER} -d ${RECEIVING_DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - waregang-net
+
+  # ==================== Redis (для сессий Gateway) ====================
+  redis:
+    image: redis:${REDIS_VERSION}
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - waregang-net
+
+  # ==================== Kafka (опционально) ====================
+  kafka:
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - waregang-net
+
+  # ==================== Auth Service ====================
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "9000:9000"           # внешний и внутренний порт совпадают
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-auth:5432/${AUTH_DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${AUTH_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
+
+      - JWT_SECRET=${JWT_SECRET}
+
+      - JWT_ACCESS_TOKEN_EXPIRATION=${JWT_ACCESS_TOKEN_EXPIRATION} #min
+      - JWT_REFRESH_TOKEN_EXPIRATION=${JWT_REFRESH_TOKEN_EXPIRATION} #h
+
+      - AUTH_SERVER_ISSUER_URL=${AUTH_SERVER_ISSUER_URL}
+      - AUTH_SERVER_REDIRECT_URI=${AUTH_SERVER_REDIRECT_URI}
+      - AUTH_SERVER_POST_LOGOUT=${AUTH_SERVER_POST_LOGOUT}
+
+      - GATEWAY_CLIENT_ID=${GATEWAY_CLIENT_ID}
+      - GATEWAY_CLIENT_SECRET=${GATEWAY_CLIENT_SECRET}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    networks:
+      - waregang-net
+
+  # ==================== API Gateway ====================
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CORS_ALLOWED_METHODS=${CORS_ALLOWED_METHODS}
+      - CORS_ALLOWED_HEADERS=${CORS_ALLOWED_HEADERS}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS}
+      - CORS_MAX_AGE=${CORS_MAX_AGE}
+
+      - GATEWAY_CLIENT_ID=${GATEWAY_CLIENT_ID}
+      - GATEWAY_CLIENT_SECRET=${GATEWAY_CLIENT_SECRET}
+      - AUTH_SERVER_ISSUER_URL=${AUTH_SERVER_ISSUER_URL}
+
+      - USER_INFO_URI=${USER_INFO_URI}
+      - JWK_SET_URI=${JWK_SET_URI}
+      - TOKEN_URI=${TOKEN_URI}
+      - AUTHORIZATION_URI=${AUTHORIZATION_URI}
+
+      - SESSION_DURATION=${SESSION_DURATION}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - waregang-net
+
+  # ==================== Receiving Service ====================
+  receiving-service:
+    build: ./receiving-service
+    container_name: receiving-service
+    ports:
+      - "8081:8080"           # внешний порт 8081, чтобы не конфликтовать с gateway
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-receiving:5432/${RECEIVING_DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${RECEIVING_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${RECEIVING_DB_PASSWORD}
+
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${AUTH_SERVER_ISSUER_URL}
+
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      postgres-receiving:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - waregang-net
+
+
+
+networks:
+  waregang-net:
+    driver: bridge
+
+volumes:
+  postgres_auth_data:
+  postgres_receiving_data:
+  postgres_inventory_data:
+  redis_data:
+
