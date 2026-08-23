@@ -48,14 +48,18 @@ and relays access tokens downstream. Session state stored in Redis.
 
 Service manages ASN processing, worker receiving sessions, barcode scanning, discrepancy detection.
 
-![Workflow](docs/receiving-process-flowchart.excalidraw.png)
+<p align="center">
+  <img src="docs/receiving-process-flowchart.excalidraw.png" alt="Workflow" width="300">
+</p>
 
 #### Architecture
 
 Follows a Ports & Adapters architecture to keep the domain independent from infrastructure.
 Some modules interact directly with JPA repositories where additional abstraction provides little benefit.
 
-![Receiving Service Architecture](docs/receiving-service-architecture.excalidraw.png)
+<p align="center">
+  <img src="docs/receiving-service-architecture.excalidraw.png" alt="Receiving Service Architecture">
+</p>
 
 
 ---
