@@ -36,7 +36,7 @@ and relays access tokens downstream. Session state stored in Redis.
 
 ### Receiving Service
 
-[GitHub Repository](https://github.com/Khinya-Khinev/Receiving-Service) (*extract-auth-service* branch)
+[GitHub Repository](https://github.com/Khinya-Khinev/Receiving-Service)
 
 [![Receiving Service CI](https://github.com/kamen-kamen/Receiving-Service/actions/workflows/ci.yaml/badge.svg)](https://github.com/kamen-kamen/Receiving-Service/actions/workflows/ci.yaml)
 
