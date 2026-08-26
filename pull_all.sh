@@ -7,6 +7,7 @@ REPOS=(
     "./Receiving-Service"
     "./Auth-Service"
     "./API-Gateway"
+    "./receiving-serivce-ui"
 )
 
 for REPO in "${REPOS[@]}"; do
@@ -28,3 +29,5 @@ for REPO in "${REPOS[@]}"; do
 done
 
 echo "Repository update completed."
+
+read

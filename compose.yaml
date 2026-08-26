@@ -17,7 +17,7 @@ services:
       timeout: 3s
       retries: 10
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== PostgreSQL для Receiving Service ====================
   postgres-receiving:
@@ -37,7 +37,7 @@ services:
       timeout: 3s
       retries: 10
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== Redis (для сессий Gateway) ====================
   redis:
@@ -56,7 +56,7 @@ services:
       timeout: 3s
       retries: 10
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== Kafka (опционально) ====================
   kafka:
@@ -84,7 +84,7 @@ services:
       retries: 20
       start_period: 10s
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== Auth Service ====================
   auth-service:
@@ -122,7 +122,7 @@ services:
       postgres-auth:
         condition: service_healthy
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== API Gateway ====================
   api-gateway:
@@ -147,6 +147,9 @@ services:
       - GATEWAY_CLIENT_SECRET=${GATEWAY_CLIENT_SECRET}
       - AUTH_SERVER_ISSUER_URL=${AUTH_SERVER_ISSUER_URL}
 
+      - SUCCESS_LOGIN_REDIRECT=${SUCCESS_LOGIN_REDIRECT}
+      - POST_LOGOUT_REDIRECT_URL=${POST_LOGOUT_REDIRECT_URL}
+
       - USER_INFO_URI=${USER_INFO_URI}
       - JWK_SET_URI=${JWK_SET_URI}
       - TOKEN_URI=${TOKEN_URI}
@@ -166,7 +169,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - waregang-net
+      - simple-wms-net
 
   # ==================== Receiving Service ====================
   receiving-service:
@@ -200,12 +203,27 @@ services:
       api-gateway:
         condition: service_healthy
     networks:
-      - waregang-net
+      - simple-wms-net
+    
+#  frontend:
+#    build: ./receiving-service-ui
+#    container_name: receiving-service-ui
+#    ports:
+#      - "5173:5173"
+#    environment:
+#      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+#    depends_on:
+#      auth-service:
+#        condition: service_started
+#      api-gateway:
+#        condition: service_healthy
+#    networks:
+#      - simple-wms-net
 
 
 
 networks:
-  waregang-net:
+  simple-wms-net:
     driver: bridge
 
 volumes:

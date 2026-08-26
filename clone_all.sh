@@ -4,6 +4,8 @@ echo "Скачивание репозиториев..."
 git clone https://github.com/Khinya-Khinev/Receiving-Service
 git clone https://github.com/Khinya-Khinev/Auth-Service
 git clone https://github.com/Khinya-Khinev/API-Gateway
+git clone https://github.com/IvanKhramoy/receiving-serivce-ui
 
 echo "Готово!"
+
 read
