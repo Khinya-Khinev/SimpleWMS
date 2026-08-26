@@ -24,7 +24,7 @@ Supports goods receiving and employee management.
 
 ## Tech Stack
 
-Java 25 · Spring Boot 4 · Spring Security · Spring Cloud Gateway · Hibernate/JPA · PostgreSQL · Flyway · Redis · Apache Kafka · JUnit 5 · Mockito · Testcontainers · Docker
+Java 25 · Spring Boot 4 · Spring Security · Spring Cloud Gateway · Hibernate/JPA · PostgreSQL · Flyway · Redis · Apache Kafka · JUnit · Mockito · Testcontainers · Docker
 
 ## Services
 
