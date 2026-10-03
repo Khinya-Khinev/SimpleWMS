@@ -1,0 +1,89 @@
+# 1. PERSISTENT VOLUME CLAIM
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# 2. CONFIGMAP
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+data:
+  KAFKA_NODE_ID: "1"
+  KAFKA_PROCESS_ROLES: "broker,controller"
+  KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-svc:9093"
+
+  # Listeners configured for internal Kubernetes networking
+  KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092"
+  KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-svc:9092,PLAINTEXT_INTERNAL://kafka-svc:29092"
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT"
+  KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+  KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT_INTERNAL"
+
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+  KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+---
+# 3. DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1  # Matches KAFKA_VERSION in .env
+          ports:
+            - containerPort: 9092
+              name: client
+            - containerPort: 9093
+              name: controller
+            - containerPort: 29092
+              name: internal
+          envFrom:
+            - configMapRef:
+                name: kafka-config
+          volumeMounts:
+            - name: kafka-storage
+              mountPath: /tmp/kraft-combined-logs  # Matches KAFKA_LOG_DIRS
+      volumes:
+        - name: kafka-storage
+          persistentVolumeClaim:
+            claimName: kafka-pvc
+---
+# 4. SERVICE
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-svc                      # Name referenced as host inside the cluster
+spec:
+  type: ClusterIP
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: client
+    - port: 9093
+      targetPort: 9093
+      name: controller
+    - port: 29092
+      targetPort: 29092
+      name: internal

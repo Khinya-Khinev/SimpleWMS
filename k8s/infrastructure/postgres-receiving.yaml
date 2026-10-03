@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-receiving-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce         # Mounted by a single node at a time
+  resources:
+    requests:
+      storage: 2Gi          # Request 2GB of persistent disk
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-receiving-config
+data:
+  POSTGRES_DB: "receiving_db"
+  POSTGRES_USER: "receiving_user"
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-receiving-secret
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "receiving_pass"
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-receiving
+spec:
+  replicas: 1               # MUST BE 1 for a single-instance DB!
+  selector:
+    matchLabels:
+      app: postgres-receiving
+  template:
+    metadata:
+      labels:
+        app: postgres-receiving
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine    # Matches POSTGRES_VERSION in .env[cite: 3]
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-receiving-config
+            - secretRef:
+                name: postgres-receiving-secret
+
+          # MOUNT THE DISK TO POSTGRES DATA DIRECTORY
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data # Standard Postgres data path
+
+      # ATTACH THE PVC DEFINED ABOVE
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-receiving-pvc
+---
+# 4. SERVICE (Allows microservices to connect)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-receiving-svc      # The host name used in SPRING_DATASOURCE_URL
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres-receiving
+  ports:
+    - port: 5432
+      targetPort: 5432
