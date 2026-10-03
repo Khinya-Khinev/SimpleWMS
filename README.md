@@ -104,6 +104,53 @@ delete repos and execute
 git config --global core.autocrlf false
    ```
 
+### Kubernetes
+
+Using Hyper-V (run PowerShell as Administrator)
+
+Start minikube
+
+```shell
+minikube start
+```
+If ingress is not added as addon
+
+```shell
+minikube addons enable ingress   # one-time
+```
+
+Build containers and load them into minikube
+
+```shell
+docker build -t receiving-service:v1 ./receiving-service
+docker build -t auth-service:v1 ./auth-service
+docker build -t api-gateway:v1 ./api-gateway
+
+minikube image load receiving-service:v1
+minikube image load auth-service:v1
+minikube image load api-gateway:v1
+```
+
+Apply manifests
+
+```shell
+kubectl apply -f k8s/ --recursive
+```
+
+Open the cluster through NGINX (leave running, then use http://localhost)
+
+```shell
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 80:80
+```
+
+To rebuilding an image (example)
+
+```shell
+docker build -t api-gateway:v1 ./api-gateway
+minikube image load --overwrite api-gateway:v1
+kubectl rollout restart deployment api-gateway
+```
+
 
 ## Next Steps
 - **Simple implementations of Notification and Inventory services**: For asynchronous messaging practice (Kafka) and Saga transactions.
